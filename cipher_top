@@ -1,0 +1,52 @@
+
+
+module cipher_top (
+input clk_sys,
+input rst_n,
+input [127:0] cipher_key,
+input [127:0] plain_text,
+input cipher_en,
+//output
+output [127:0] cipher_text,
+output [127:0] round_key_out,
+output cipher_complete,
+output cipher_ready
+);
+
+   // Internal signals
+   logic [3:0] round_number;
+   logic rkey_en;
+   logic key_exp_en;
+   
+   
+   cipher_core cipher_core_inst (
+      //input
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .cipher_key (cipher_key[127:0]),
+      .round_key (round_key_out[127:0]),
+      .plain_text (plain_text[127:0]),
+      .cipher_en (cipher_en),
+      //output
+      .cipher_text (cipher_text[127:0]),
+      .cipher_ready (cipher_ready),
+      .round_number (round_number[3:0]),
+      .rkey_en (rkey_en),
+      .cipher_complete(cipher_complete),
+      .key_exp_en (key_exp_en)
+   );
+
+   key_expansion key_expansion_inst (
+      //input
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .cipher_en (cipher_en),
+      .rkey_en (rkey_en),
+      .key_exp_en (key_exp_en),
+      .cipher_key (cipher_key[127:0]),
+      .round_number (round_number[3:0]),
+      //output
+      .round_key_out (round_key_out)
+   );
+
+endmodule
