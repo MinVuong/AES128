@@ -1,0 +1,167 @@
+module aes_top (
+// inputs
+input clk_sys,
+input rst_n,
+input aes_en,
+input [127:0] text_in,
+input [127:0] key_in,
+// outputs
+output logic  aes_ready,
+output [127:0] text_out,
+output [127:0] key_out
+);
+
+   // internal signals
+   logic cipher_en;
+   logic cipher_ready;
+   logic cipher_complete;
+
+   // delay_signals
+   logic delay_1;
+   logic delay_2;
+   logic delay_3;
+   logic delay_4;
+   logic delay_5;
+
+   // after_encoder_signals
+   logic [127:0] cipher_text;
+   logic [127:0] round_key_out;
+
+   // after_encoder_register
+   logic [127:0] mid_key;
+   logic [127:0] mid_text;
+
+   // input_decoder
+   logic [127:0] before_decoder_text;
+   logic [127:0] before_decoder_key;
+   logic decipher_en;
+
+   // after_decoder_signals
+   logic decipher_ready;
+   logic decipher_complete;
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) cipher_en <= 1'b0;
+      else begin
+         if (aes_en) cipher_en <= 1'b1;
+         else cipher_en <= 1'b0;
+      end
+   end
+
+   cipher_top encoder (
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .cipher_en (cipher_en),
+      .cipher_key (key_in),
+      .plain_text (text_in),
+      .cipher_ready (cipher_ready),
+      .cipher_text (cipher_text),
+      .round_key_out (round_key_out),
+      .cipher_complete (cipher_complete)
+   );
+
+   // start delay
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) delay_1 <= 1'b0;
+      else begin
+         if (cipher_complete) delay_1 <= 1'b1;
+         else delay_1 <= 1'b0;
+      end
+   end
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) delay_2 <= 1'b0;
+      else begin
+         if (delay_1) begin
+            if (delay_3) delay_2 <= 1'b0;
+            else delay_2 <= 1'b1;
+         end        
+         else delay_2 <= 1'b0;
+      end
+   end
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) delay_3 <= 1'b0;
+      else begin
+         if (delay_2) begin
+            if (delay_4) delay_3 <= 1'b0;
+            else delay_3 <= 1'b1;
+         end        
+         else delay_3 <= 1'b0;
+      end
+   end
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) delay_4 <= 1'b0;
+      else begin
+         if (delay_3) begin
+            if (delay_5) delay_4 <= 1'b0;
+            else delay_4 <= 1'b1;
+         end        
+         else delay_4 <= 1'b0;
+      end
+   end
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) delay_5 <= 1'b0;
+      else begin
+         if (delay_4) delay_5 <= 1'b1;
+         else delay_5 <= 1'b0;
+      end
+   end
+   // end delay
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) begin
+         mid_text <= 128'b0;
+         mid_key <= 128'b0;
+      end
+      else if (delay_1) begin
+         mid_text <= cipher_text;
+         mid_key <= round_key_out;
+      end
+   end
+
+   register after_encoder_text (
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .data_in (mid_text),
+      .data_out (before_decoder_text)
+   );
+
+   register after_encoder_key (
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .data_in (mid_key),
+      .data_out (before_decoder_key)
+   );
+
+   always @(posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) decipher_en <= 1'b0;
+      else begin
+         if (delay_5) decipher_en <= 1'b1;
+         else decipher_en <= 1'b0;
+      end
+   end
+
+   decipher_top decoder (
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .decipher_en (decipher_en),
+      .cipher_text (before_decoder_text),
+      .round_key_10 (before_decoder_key),
+      .decipher_ready (decipher_ready),
+      .plain_text (text_out),
+      .inv_round_key_out (key_out),
+      .decipher_complete (decipher_complete)
+   );
+
+   always @ (posedge clk_sys, negedge rst_n) begin
+      if (~rst_n) aes_ready <= 1'b1;
+      else begin
+         if (cipher_en) aes_ready <= 1'b0;
+         else if (decipher_complete) aes_ready <= 1'b1;
+      end
+   end
+
+endmodule
