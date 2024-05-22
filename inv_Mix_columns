@@ -1,0 +1,76 @@
+function logic [7:0] mul_2;
+   input [7:0] mul_2_in;
+   mul_2[7:0] = (mul_2_in[7] == 1'b1)? ({mul_2_in[6:0], 1'b0} ^ 8'b0001_1011) : {mul_2_in[6:0], 1'b0};
+endfunction
+
+
+function logic [7:0] inv_mul;
+   input [7:0] mul_in;
+   input [1:0] mul_sel;
+  
+   //Declare intermediate variables
+   logic [7:0] mul_2_result;
+   logic [7:0] mul_4_result;
+   logic [7:0] mul_8_result;
+   logic [7:0] mul_0e;
+   logic [7:0] mul_0b;
+   logic [7:0] mul_0d;
+   logic [7:0] mul_09;
+
+   //Compute intermediate results
+   mul_2_result[7:0] = mul_2(mul_in[7:0]);
+   mul_4_result[7:0] = mul_2(mul_2_result[7:0]);
+   mul_8_result[7:0] = mul_2(mul_4_result[7:0]);
+   mul_0e[7:0] = mul_2_result ^ mul_4_result ^ mul_8_result;
+   mul_0b[7:0] = mul_2_result ^               mul_8_result ^ mul_in[7:0];
+   mul_0d[7:0] =               mul_4_result ^ mul_8_result ^ mul_in[7:0];
+   mul_09[7:0] =                             mul_8_result ^ mul_in[7:0];
+  
+   //Compute final values based on selector  
+   case (mul_sel[1:0])
+      2'b00: inv_mul[7:0] = mul_0e[7:0];
+      2'b01: inv_mul[7:0] = mul_0b[7:0];
+      2'b10: inv_mul[7:0] = mul_0d[7:0];
+      2'b11: inv_mul[7:0] = mul_09[7:0];
+      default: inv_mul[7:0] = mul_0e[7:0];
+   endcase
+endfunction
+
+
+//Multiplication of the InvMixColumns matrix and a column of state matrix
+function logic [31:0] inv_mix_col;
+   parameter MIX_0E = 2'b00;
+   parameter MIX_0B = 2'b01;
+   parameter MIX_0D = 2'b10;
+   parameter MIX_09 = 2'b11;
+   
+   input [31:0] inv_mixcol_in;
+
+   inv_mix_col[31:24] = inv_mul(inv_mixcol_in[31:24] , MIX_0E) 
+                      ^ inv_mul(inv_mixcol_in[23:16] , MIX_0B) 
+                      ^ inv_mul(inv_mixcol_in[15:8] , MIX_0D) 
+                      ^ inv_mul(inv_mixcol_in[7:0] , MIX_09);
+                     
+   inv_mix_col[23:16] = inv_mul(inv_mixcol_in[31:24] , MIX_09) 
+                      ^ inv_mul(inv_mixcol_in[23:16] , MIX_0E) 
+                      ^ inv_mul(inv_mixcol_in[15:8] , MIX_0B) 
+                      ^ inv_mul(inv_mixcol_in[7:0] , MIX_0D);
+                     
+   inv_mix_col[15:8]  = inv_mul(inv_mixcol_in[31:24] , MIX_0D) 
+                      ^ inv_mul(inv_mixcol_in[23:16] , MIX_09) 
+                      ^ inv_mul(inv_mixcol_in[15:8] , MIX_0E) 
+                      ^ inv_mul(inv_mixcol_in[7:0] , MIX_0B);
+                     
+   inv_mix_col[7:0]   = inv_mul(inv_mixcol_in[31:24] , MIX_0B) 
+                      ^ inv_mul(inv_mixcol_in[23:16] , MIX_0D) 
+                      ^ inv_mul(inv_mixcol_in[15:8] , MIX_09) 
+                      ^ inv_mul(inv_mixcol_in[7:0] , MIX_0E);
+endfunction
+
+module InvMixColumns (
+input [31:0] inv_mixcol_in,
+output [31:0] inv_mixcol_result);
+
+   assign inv_mixcol_result = inv_mix_col (inv_mixcol_in);
+
+endmodule
