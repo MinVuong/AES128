@@ -1,0 +1,26 @@
+module inv_add_rcon(
+input wire [3:0] inv_rcon_sel,
+input wire rst_n,
+output reg [31:0] inv_rcon
+);
+
+   always @(*) begin
+      if(~rst_n) inv_rcon = 32'h00000000;
+      else begin
+         case (inv_rcon_sel)
+            4'd9: inv_rcon = 32'h01000000;
+            4'd8: inv_rcon = 32'h02000000;
+            4'd7: inv_rcon = 32'h04000000;
+            4'd6: inv_rcon = 32'h08000000;
+            4'd5: inv_rcon = 32'h10000000;
+            4'd4: inv_rcon = 32'h20000000;
+            4'd3: inv_rcon = 32'h40000000;
+            4'd2: inv_rcon = 32'h80000000;
+            4'd1: inv_rcon = 32'h1b000000;
+            4'd0: inv_rcon = 32'h36000000;
+            default: inv_rcon = 32'h00000000;
+         endcase
+      end
+   end
+
+endmodule
