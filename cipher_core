@@ -1,0 +1,219 @@
+
+
+module cipher_core (
+input [127:0] plain_text,
+input [127:0] cipher_key,
+input [127:0] round_key,
+input clk_sys,
+input cipher_en,
+input rst_n,
+output rkey_en,
+output key_exp_en,
+output logic [127:0] cipher_text,
+ output logic  cipher_ready,
+ output logic cipher_complete,
+output logic [3:0] round_number
+);
+
+   // Internal signals 
+  logic [3:0] cipher_counter;
+   //logic cipher_complete;
+   logic [127:0] cipher_text_reg;
+   logic [127:0] subbytes_sel;
+   logic [127:0] after_subbytes;
+   logic [127:0] after_shiftrows;
+   logic [127:0] mixcolumns_in;
+   logic [127:0] after_mixcolumns;
+   logic [127:0] addroundkey_in;
+   logic [127:0] after_addroundkey;
+   
+  // Cipher_Round_Number_Counter
+   always @ ( posedge clk_sys, negedge rst_n) begin
+      if (~rst_n) cipher_counter <= 4'd0;
+      else begin
+         if (cipher_complete) cipher_counter <= 4'd0;
+         else if (cipher_en |  rkey_en) cipher_counter <= cipher_counter +1'b1;
+      end
+   end
+   
+   assign cipher_complete = (cipher_counter == 4'b1010) ? 1'b1 : 1'b0;
+   assign round_number[3:0] = cipher_counter [3:0];
+
+   // dk thanh ghi trang thai cipher ready
+   always @ (posedge clk_sys, negedge rst_n) begin
+      if (~rst_n) cipher_ready <=1'b1;
+      else begin 
+         if (cipher_en) cipher_ready <=1'b0;
+         else if (cipher_complete) cipher_ready <=1'b1;
+      end
+   end
+   assign rkey_en = ~cipher_ready;
+   assign key_exp_en = (cipher_counter == 4'b1010) ? 1'b0 : 1'b1;
+
+   // gan du lieu ban dau cho chuong trinh de thuc hien subbytes
+   assign subbytes_sel[127:120]	= cipher_text_reg[127:120];
+   assign subbytes_sel[119:112]	= cipher_text_reg[95:88];
+   assign subbytes_sel[111:104]	= cipher_text_reg[63:56];
+   assign subbytes_sel[103:96]	= cipher_text_reg[31:24];
+   assign subbytes_sel[95:88]	= cipher_text_reg[119:112];
+   assign subbytes_sel[87:80]	= cipher_text_reg[87:80];
+   assign subbytes_sel[79:72]	= cipher_text_reg[55:48];
+   assign subbytes_sel[71:64]	= cipher_text_reg[23:16];
+   assign subbytes_sel[63:56]	= cipher_text_reg[111:104];
+   assign subbytes_sel[55:48]	= cipher_text_reg[79:72];
+   assign subbytes_sel[47:40]	= cipher_text_reg[47:40];
+   assign subbytes_sel[39:32]	= cipher_text_reg[15:8];
+   assign subbytes_sel[31:24]	= cipher_text_reg[103:96];
+   assign subbytes_sel[23:16]	= cipher_text_reg[71:64];
+   assign subbytes_sel[15:8]	= cipher_text_reg[39:32];
+   assign subbytes_sel[7:0]	= cipher_text_reg[7:0];
+  
+   // thuc hien subbyte bang S_box
+   sbox Sbox_inst_a(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[127:120]),
+.after_sbox (after_subbytes[127:120]));
+
+   sbox Sbox_inst_b(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[119:112]),
+.after_sbox (after_subbytes[119:112]));
+
+   sbox Sbox_inst_c(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[111:104]),
+.after_sbox (after_subbytes[111:104]));
+
+   sbox Sbox_inst_d(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[103:96]),
+.after_sbox (after_subbytes[103:96]));
+
+   sbox Sbox_inst_e(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[95:88]),
+.after_sbox (after_subbytes[95:88]));
+
+   sbox Sbox_inst_f(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[87:80]),
+.after_sbox (after_subbytes[87:80]));
+
+   sbox Sbox_inst_g(.rst_n(rst_n),
+.sbox_in (subbytes_sel[79:72]),
+.after_sbox (after_subbytes[79:72]));
+
+   sbox Sbox_inst_h(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[71:64]),
+.after_sbox (after_subbytes[71:64]));
+
+   sbox Sbox_inst_i(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[63:56]),
+.after_sbox (after_subbytes[63:56]));
+
+   sbox Sbox_inst_j(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[55:48]),
+.after_sbox (after_subbytes[55:48]));
+
+   sbox Sbox_inst_k(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[47:40]),
+.after_sbox (after_subbytes[47:40]));
+
+   sbox Sbox_inst_l(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[39:32]),
+.after_sbox (after_subbytes[39:32]));
+
+   sbox Sbox_inst_m(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[31:24]),
+.after_sbox (after_subbytes[31:24]));
+
+   sbox Sbox_inst_n(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[23:16]),
+.after_sbox (after_subbytes[23:16]));
+
+   sbox Sbox_inst_o(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[15:8]),
+.after_sbox (after_subbytes[15:8]));
+
+   sbox Sbox_inst_p(
+.rst_n (rst_n),
+.sbox_in (subbytes_sel[7:0]),
+.after_sbox (after_subbytes[7:0]));
+
+   // thuc hien shiftrow
+   always @ (*) begin
+      // hang 1 khong dich
+      after_shiftrows[127:120] = after_subbytes[127:120];
+      after_shiftrows[119:112] = after_subbytes[119:112];
+      after_shiftrows[111:104] = after_subbytes[111:104];
+      after_shiftrows[103:96]  = after_subbytes[103:96];
+      // hang 2 --> dich 1  byte
+      after_shiftrows[71:64] = after_subbytes[95:88];
+      after_shiftrows[95:88] = after_subbytes[87:80];
+      after_shiftrows[87:80] = after_subbytes[79:72];
+      after_shiftrows[79:72] = after_subbytes[71:64];
+      //hang 3 dich 2 bytes
+      after_shiftrows[47:40] = after_subbytes[63:56];
+      after_shiftrows[39:32] = after_subbytes[55:48];
+      after_shiftrows[63:56] = after_subbytes[47:40];
+      after_shiftrows[55:48] = after_subbytes[39:32];
+      // hang 4 dich 3 bytes
+      after_shiftrows[23:16] = after_subbytes[31:24];
+      after_shiftrows[15:8]  = after_subbytes[23:16];
+      after_shiftrows[7:0]   = after_subbytes[15:8];
+      after_shiftrows[31:24] = after_subbytes[7:0];
+   end
+    
+   // thuc hien tach tung cot cua ma tran
+   assign mixcolumns_in[127:96]	= {after_shiftrows[127:120],
+                                   after_shiftrows[95:88],
+  				   after_shiftrows[63:56],
+                                   after_shiftrows[31:24]};
+                                 
+   assign mixcolumns_in[95:64]	= {after_shiftrows[119:112],
+                                   after_shiftrows[87:80],
+  				   after_shiftrows[55:48],
+                                   after_shiftrows[23:16]};
+                                 
+   assign mixcolumns_in[63:32]	= {after_shiftrows[111:104],
+                                   after_shiftrows[79:72],
+  				   after_shiftrows[47:40],
+                                   after_shiftrows[15:8]};
+                                 
+   assign mixcolumns_in[31:0]	= {after_shiftrows[103:96],
+                                   after_shiftrows[71:64],
+  				   after_shiftrows[39:32],
+                                   after_shiftrows[7:0]};
+   
+   // thuc hien Mixcolumn
+   MixColumn MixColumn1(.mixcol_in(mixcolumns_in[127:96]),.mixcol_out(after_mixcolumns[127:96]));
+    MixColumn MixColumn2(.mixcol_in(mixcolumns_in[95:64]),.mixcol_out(after_mixcolumns[95:64]));
+ MixColumn MixColumn3(.mixcol_in(mixcolumns_in[63:32]),.mixcol_out(after_mixcolumns[63:32]));
+ MixColumn MixColumn4(.mixcol_in(mixcolumns_in[31:0]),.mixcol_out(after_mixcolumns[31:0]));
+   //assign after_mixcolumns[127:96] = mixcol(mixcolumns_in[127:96]);
+   //assign after_mixcolumns[95:64]  = mixcol(mixcolumns_in[95:64]);
+   //assign after_mixcolumns[63:32]  = mixcol(mixcolumns_in[63:32]);
+   //assign after_mixcolumns[31:0]   = mixcol(mixcolumns_in[31:0]);   
+   
+   // Addroundkey
+   assign addroundkey_in[127:0] = cipher_en? plain_text[127:0]: (cipher_complete? mixcolumns_in[127:0]: after_mixcolumns[127:0]);
+   assign after_addroundkey[127:0] = addroundkey_in[127:0] ^ (cipher_en? cipher_key[127:0]: round_key[127:0]);
+  //Cipher text register
+   always @ (posedge clk_sys, negedge rst_n ) begin
+      if (~rst_n)  cipher_text_reg <= 128'h00;
+      else  if (cipher_en | rkey_en)  cipher_text_reg <= after_addroundkey;
+
+   end
+  
+   //ket qua cuoi cung
+   assign cipher_text = cipher_text_reg;
+
+endmodule
