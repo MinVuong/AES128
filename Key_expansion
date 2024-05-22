@@ -1,0 +1,78 @@
+
+
+module key_expansion (
+input [127:0] cipher_key,
+input  clk_sys,
+input rst_n,
+input  cipher_en,
+input  rkey_en,
+input key_exp_en,
+input [3:0] round_number,
+output logic [127:0] round_key_out
+);
+
+   // Internal  signal 
+   logic [127:0] round_key;
+   logic [127:0] round_key_reg;
+   logic [127:0] after_rotword;
+   logic [127:0] key_in;
+   logic [31:0] rcon_value;
+   logic [31:0] after_add_rcon;
+   logic [31:0] after_subword;
+
+   always @ (posedge clk_sys or negedge rst_n ) begin
+      if (~rst_n) begin
+         round_key_reg[127:0] <= 32'h00;
+      end
+      else begin
+         if (key_exp_en) begin
+            if (cipher_en | rkey_en) round_key_reg[127:0] <= round_key[127:0];
+         end
+         else begin
+            round_key_reg[127:0] <= round_key_reg[127:0];
+         end
+      end
+   end
+
+   assign round_key_out[127:0] = round_key_reg[127:0];
+   assign key_in[127:0] = (round_number[3:0]==4'd0)?cipher_key[127:0] : round_key_reg[127:0];
+
+   // RotWord
+   assign after_rotword[31:0]={key_in[23:0],key_in[31:24]};
+
+   // SubWord
+   sbox sbox_inst_1 (
+      .rst_n (rst_n),
+      .sbox_in (after_rotword[31:24]),
+      .after_sbox (after_subword[31:24]));
+
+   sbox sbox_inst_2 (
+      .rst_n (rst_n),
+      .sbox_in (after_rotword[23:16]),
+      .after_sbox (after_subword[23:16]));
+
+   sbox sbox_inst_3 (
+      .rst_n (rst_n),
+      .sbox_in (after_rotword[15:8]),
+      .after_sbox (after_subword[15:8]));
+
+   sbox sbox_inst_4 (
+      .rst_n (rst_n),
+      .sbox_in (after_rotword[7:0]),
+      .after_sbox (after_subword[7:0]));
+
+   // Add_Rcons
+   add_rcons add_rcons_inst (
+      .rst_n(rst_n),
+      .rcon_sel(round_number[3:0]),
+      .rcon_value(rcon_value[31:0]));
+
+   assign after_add_rcon = after_subword ^ rcon_value;
+
+   // conclude rcon output <-> AddW
+   assign round_key[127:96] = after_add_rcon ^ key_in[127:96];
+   assign round_key [95:64] = round_key[127:96] ^ key_in [95:64];
+   assign round_key [63:32] = round_key[95:64] ^ key_in [63:32];
+   assign round_key [31:0] = round_key[63:32] ^ key_in [31:0];
+
+endmodule
