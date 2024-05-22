@@ -1,0 +1,201 @@
+
+
+module decipher_core(
+
+//input
+input clk_sys,
+input rst_n,
+input [127:0]	round_key_10,
+input [127:0]	round_key_inv,
+input [127:0]	cipher_text,
+input decipher_en,
+
+//output
+output logic [127:0] plain_text,
+output logic decipher_ready,
+output logic [3:0] round_number,
+output logic round_key_en,
+output logic decipher_complete,
+output logic inv_key_exp_en
+);
+
+   //Internal signals
+   logic [3:0] decipher_counter;
+   
+   logic [127:0] InvShiftRows_in;
+   logic [127:0] after_InvShiftRows;
+   logic [127:0] after_InvSubBytes;
+   logic [127:0] after_InvMixCol;
+   logic [127:0] round_key;
+   logic [127:0] AddRoundKey_in;
+   logic [127:0] after_AddRoundKey;
+   logic [127:0] plain_text_reg;
+   logic [127:0] InvShiftRows_result;
+   wire first_time_en;
+
+  
+   //Monitor counters
+   always @ (posedge clk_sys, negedge rst_n) begin
+      if (~rst_n) decipher_counter <= 4'd0;
+      else begin
+         if (decipher_complete) decipher_counter <= 4'd0;
+         else if (decipher_en | round_key_en) decipher_counter <= decipher_counter + 1'b1;
+      end
+   end
+
+   assign decipher_complete = (decipher_counter == 4'b1010)? 1'b1: 1'b0;
+   assign round_number[3:0]  = decipher_counter[3:0];
+   //Decipher status
+   always @ (posedge clk_sys, negedge rst_n) begin
+      if (~rst_n) decipher_ready <= 1'b1;
+      else begin
+         if (decipher_en) decipher_ready <= 1'b0;
+         else if (decipher_complete) decipher_ready <= 1'b1;
+      end
+   end
+
+   assign round_key_en = ~decipher_ready;
+   assign inv_key_exp_en = (decipher_counter == 4'b1010) ? 1'b0 : 1'b1;
+
+   //Select the connection for first time and next times
+   assign first_time_en = (decipher_counter[3:0] == 4'd1);
+
+   //Re-order from bit stream to columns
+   assign InvShiftRows_in[127:120] = first_time_en? plain_text_reg[127:120]: after_InvMixCol[127:120];
+   assign InvShiftRows_in[119:112]	= first_time_en? plain_text_reg[95:88]  : after_InvMixCol[95:88]  ;
+   assign InvShiftRows_in[111:104]	= first_time_en? plain_text_reg[63:56]  : after_InvMixCol[63:56]  ;
+   assign InvShiftRows_in[103:96]	 = first_time_en? plain_text_reg[31:24]  : after_InvMixCol[31:24]  ;
+   assign InvShiftRows_in[95:88]	  = first_time_en? plain_text_reg[119:112]: after_InvMixCol[119:112];
+   assign InvShiftRows_in[87:80]	  = first_time_en? plain_text_reg[87:80]  : after_InvMixCol[87:80]  ;
+   assign InvShiftRows_in[79:72]	  = first_time_en? plain_text_reg[55:48]  : after_InvMixCol[55:48]  ;
+   assign InvShiftRows_in[71:64]	  = first_time_en? plain_text_reg[23:16]  : after_InvMixCol[23:16]  ;
+   assign InvShiftRows_in[63:56]	  = first_time_en? plain_text_reg[111:104]: after_InvMixCol[111:104];
+   assign InvShiftRows_in[55:48]	  = first_time_en? plain_text_reg[79:72]  : after_InvMixCol[79:72]  ;
+   assign InvShiftRows_in[47:40]	  = first_time_en? plain_text_reg[47:40]  : after_InvMixCol[47:40]  ;
+   assign InvShiftRows_in[39:32]	  = first_time_en? plain_text_reg[15:8]   : after_InvMixCol[15:8]   ;
+   assign InvShiftRows_in[31:24]	  = first_time_en? plain_text_reg[103:96] : after_InvMixCol[103:96] ;
+   assign InvShiftRows_in[23:16]	  = first_time_en? plain_text_reg[71:64]  : after_InvMixCol[71:64]  ;
+   assign InvShiftRows_in[15:8]	  = first_time_en? plain_text_reg[39:32]  : after_InvMixCol[39:32]  ;
+   assign InvShiftRows_in[7:0]	    = first_time_en? plain_text_reg[7:0]    : after_InvMixCol[7:0]    ;
+
+   //InvShiftRows
+   assign after_InvShiftRows[127:0] = {InvShiftRows_in[127:96],  //No shift
+InvShiftRows_in[71:64], InvShiftRows_in[95:72], //Shift 1 byte
+InvShiftRows_in[47:32], InvShiftRows_in[63:48], //Shift 2 byte
+InvShiftRows_in[23:0],  InvShiftRows_in[31:24]}; //Shift 3 byte
+
+   //Re-order from bit stream to columns
+   assign InvShiftRows_result[127:120] = after_InvShiftRows[127:120];
+   assign InvShiftRows_result[119:112] = after_InvShiftRows[95:88]  ;
+   assign InvShiftRows_result[111:104] = after_InvShiftRows[63:56]  ;
+   assign InvShiftRows_result[103:96] = after_InvShiftRows[31:24]  ;
+   assign InvShiftRows_result[95:88] = after_InvShiftRows[119:112];
+   assign InvShiftRows_result[87:80] = after_InvShiftRows[87:80]  ;
+   assign InvShiftRows_result[79:72] = after_InvShiftRows[55:48]  ;
+   assign InvShiftRows_result[71:64]  = after_InvShiftRows[23:16]  ;
+   assign InvShiftRows_result[63:56] = after_InvShiftRows[111:104];
+   assign InvShiftRows_result[55:48] = after_InvShiftRows[79:72]  ;
+   assign InvShiftRows_result[47:40] = after_InvShiftRows[47:40]  ;
+   assign InvShiftRows_result[39:32] = after_InvShiftRows[15:8]   ;
+   assign InvShiftRows_result[31:24] = after_InvShiftRows[103:96] ;
+   assign InvShiftRows_result[23:16] = after_InvShiftRows[71:64]  ;
+   assign InvShiftRows_result[15:8] = after_InvShiftRows[39:32]  ;
+   assign InvShiftRows_result[7:0] = after_InvShiftRows[7:0]    ;
+
+   //InvSubBytes
+   inv_sbox sub_inv_sbox1(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[127:120]),
+      .after_inv_sbox (after_InvSubBytes[127:120]));
+   inv_sbox sub_inv_sbox2(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[119:112]),
+      .after_inv_sbox (after_InvSubBytes[119:112]));
+   inv_sbox sub_inv_sbox3(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[111:104]),
+      .after_inv_sbox (after_InvSubBytes[111:104]));
+   inv_sbox sub_inv_sbox4(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[103:96]),
+      .after_inv_sbox (after_InvSubBytes[103:96]));
+   inv_sbox sub_inv_sbox5(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[95:88]),
+      .after_inv_sbox (after_InvSubBytes[95:88]));
+   inv_sbox sub_inv_sbox6(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[87:80]),
+      .after_inv_sbox (after_InvSubBytes[87:80]));
+   inv_sbox sub_inv_sbox7(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[79:72]),
+      .after_inv_sbox (after_InvSubBytes[79:72]));
+   inv_sbox sub_inv_sbox8(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[71:64]),
+      .after_inv_sbox (after_InvSubBytes[71:64]));
+   inv_sbox sub_inv_sbox9(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[63:56]),
+      .after_inv_sbox (after_InvSubBytes[63:56]));
+   inv_sbox sub_inv_sbox10(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[55:48]),
+      .after_inv_sbox (after_InvSubBytes[55:48]));
+   inv_sbox sub_inv_sbox11(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[47:40]),
+      .after_inv_sbox (after_InvSubBytes[47:40]));
+   inv_sbox sub_inv_sbox12(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[39:32]),
+      .after_inv_sbox (after_InvSubBytes[39:32]));
+   inv_sbox sub_inv_sbox13(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[31:24]),
+      .after_inv_sbox (after_InvSubBytes[31:24]));
+   inv_sbox sub_inv_sbox14(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[23:16]),
+      .after_inv_sbox (after_InvSubBytes[23:16]));
+   inv_sbox sub_inv_sbox15(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[15:8]),
+      .after_inv_sbox (after_InvSubBytes[15:8]));
+   inv_sbox sub_inv_sbox16(
+      .rst_n (rst_n),
+      .inv_sbox_in (InvShiftRows_result[7:0]),
+      .after_inv_sbox (after_InvSubBytes[7:0]));
+
+   //InvMixColumns - input from AddRoundKey
+   InvMixColumns inv_mixcol_1 (
+      .inv_mixcol_in (plain_text_reg[127:96]),
+      .inv_mixcol_result (after_InvMixCol[127:96]));
+
+   InvMixColumns inv_mixcol_2 (
+      .inv_mixcol_in (plain_text_reg[95:64]),
+      .inv_mixcol_result (after_InvMixCol[95:64]));
+
+   InvMixColumns inv_mixcol_3 (
+      .inv_mixcol_in (plain_text_reg[63:32]),
+      .inv_mixcol_result (after_InvMixCol[63:32]));
+
+   InvMixColumns inv_mixcol_4 (
+      .inv_mixcol_in (plain_text_reg[31:0]),
+      .inv_mixcol_result (after_InvMixCol[31:0]));
+
+   //AddRoundKey
+   assign round_key[127:0] = decipher_en ? round_key_10[127:0] : round_key_inv[127:0];
+   assign AddRoundKey_in[127:0] = decipher_en ? cipher_text[127:0] : after_InvSubBytes[127:0];
+   assign after_AddRoundKey[127:0] = AddRoundKey_in[127:0] ^ round_key[127:0];
+
+   //Output register
+   always @ (posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) plain_text_reg <= 128'h00;
+      else if (decipher_en | round_key_en) plain_text_reg <= after_AddRoundKey[127:0];
+   end
+
+   assign plain_text[127:0] = plain_text_reg[127:0];
+
+endmodule
