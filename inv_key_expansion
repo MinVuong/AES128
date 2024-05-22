@@ -1,0 +1,87 @@
+
+
+module inv_key_exp(
+
+//input
+input clk_sys,
+input rst_n,
+input decipher_en,
+input round_key_en,
+input inv_key_exp_en,
+input [127:0]	round_key_10,
+input [3:0] round_number,
+
+//output
+output logic [127:0] inv_round_key_out
+);
+
+   //Internal signals
+   logic [127:0] round_key_reg;
+   logic [127:0] key_in;
+   logic [127:0] round_key;
+   logic [31:0] after_subword;
+   logic [31:0] after_rotword;
+   logic [31:0] after_add_rcon;
+   logic [31:0] inv_rcon;
+
+   //Storing Round Key
+   always @ (posedge clk_sys or negedge rst_n) begin
+      if (~rst_n) begin
+         round_key_reg[127:0] <= 32'h00;
+      end
+      else begin
+         if (inv_key_exp_en) begin
+            if (decipher_en | round_key_en) round_key_reg[127:0] <= round_key[127:0];
+         end
+         else begin
+               round_key_reg[127:0] <= round_key_reg[127:0];
+         end
+      end
+   end
+
+   assign inv_round_key_out[127:0] = round_key_reg[127:0];
+   assign key_in[127:0] = (round_number[3:0] == 4'd0) ? round_key_10[127:0] : round_key_reg[127:0];
+
+   //AddWord
+   assign round_key[31:0]  = key_in[31:0] ^ key_in[63:32];
+   assign round_key[63:32] = key_in[63:32] ^ key_in[95:64];
+   assign round_key[95:64] = key_in[95:64] ^ key_in[127:96];
+  
+   //RotWord
+   assign after_rotword = {round_key[23:0], round_key[31:24]};
+
+   //SubWord with sbox
+   sbox Subsbox1(
+      .rst_n(rst_n),
+      .sbox_in(after_rotword[31:24]),
+      .after_sbox(after_subword[31:24]));
+
+   sbox Subsbox2(
+      .rst_n(rst_n),
+      .sbox_in(after_rotword[23:16]),
+      .after_sbox(after_subword[23:16]));
+
+   sbox Subsbox3(
+      .rst_n(rst_n),
+      .sbox_in(after_rotword[15:8]),
+      .after_sbox(after_subword[15:8]));
+
+   sbox Subsbox4(
+      .rst_n(rst_n),
+      .sbox_in(after_rotword[7:0]),
+      .after_sbox(after_subword[7:0])
+   );
+
+   //Inv_Add_Rcon is XOR Rcon value
+   inv_add_rcon inv_add_rcon_1(
+      .rst_n(rst_n),
+      .inv_rcon_sel (round_number[3:0]),
+      .inv_rcon (inv_rcon[31:0])
+   );
+
+   assign after_add_rcon = after_subword ^ inv_rcon;
+  
+   //Calculate word[0]
+   assign round_key[127:96] = after_add_rcon [31:0] ^ key_in[127:96];
+
+endmodule
