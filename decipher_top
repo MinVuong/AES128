@@ -1,0 +1,55 @@
+
+
+module decipher_top (
+
+//input
+input clk_sys,
+input rst_n,
+input [127:0] cipher_text,
+input [127:0] round_key_10,
+input decipher_en,
+
+//output
+output [127:0] plain_text,
+output decipher_complete,
+output [127:0] inv_round_key_out,
+output decipher_ready
+);
+
+   //Internal signals
+   logic [3:0] round_number;
+   logic round_key_en;
+   logic inv_key_exp_en;
+   
+
+   decipher_core decipher_core_1 (
+      //input
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .round_key_10 (round_key_10[127:0]),
+      .round_key_inv (inv_round_key_out[127:0]),
+      .cipher_text (cipher_text[127:0]),
+      .decipher_en (decipher_en),
+      //output
+      .plain_text (plain_text[127:0]),
+      .decipher_ready (decipher_ready),
+      .round_number (round_number[3:0]),
+      .round_key_en (round_key_en),
+      .decipher_complete(decipher_complete),
+      .inv_key_exp_en (inv_key_exp_en)
+    );
+  
+   inv_key_exp inv_key_exp_1 (
+      //input
+      .clk_sys (clk_sys),
+      .rst_n (rst_n),
+      .decipher_en (decipher_en),
+      .round_key_en (round_key_en),
+      .inv_key_exp_en (inv_key_exp_en),
+      .round_key_10 (round_key_10[127:0]),
+      .round_number (round_number[3:0]),
+      //output
+      .inv_round_key_out (inv_round_key_out)
+   );
+
+endmodule
